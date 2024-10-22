@@ -15,19 +15,29 @@ class AuthController extends Controller
      */
     public function register(Request $request)
     {
+        // Validar los datos de entrada
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
         ]);
 
+        // Crear un nuevo usuario
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => Hash::make($request->password),  // Asegúrate de encriptar la contraseña
+            'password' => Hash::make($request->password),  // Encriptar la contraseña
         ]);
 
-        return response()->json($user, 201);
+        // Crear el token para el nuevo usuario
+        $token = $user->createToken('api-token')->plainTextToken;
+
+        // Devolver la respuesta con el token y el usuario
+        return response()->json([
+            'token' => $token,
+            'token_type' => 'Bearer',
+            'user' => $user
+        ], 201);
     }
 
     /**
@@ -35,30 +45,26 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
-        // Validar los datos del login
         $request->validate([
             'email' => 'required|string|email',
             'password' => 'required|string',
         ]);
 
-        // Intentar autenticar al usuario
-        if (!Auth::attempt($request->only('email', 'password'))) {
+        // Verifica las credenciales
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
-                'message' => 'Credenciales no válidas'
+                'message' => 'Las credenciales son incorrectas.'
             ], 401);
         }
 
-        // Obtener el usuario autenticado
-        $user = Auth::user();
-
-        // Generar el token con Sanctum
+        // Genera un token para el usuario autenticado
         $token = $user->createToken('api-token')->plainTextToken;
 
-        // Retornar el token y el usuario en la respuesta
         return response()->json([
-            'token' => $token,
+            'access_token' => $token,
             'token_type' => 'Bearer',
-            'user' => $user
         ]);
     }
 
